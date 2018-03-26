@@ -67,7 +67,7 @@ abstract class AphrontResponse extends Phobject {
   public function getHeaders() {
     $headers = array();
     if (!$this->frameable) {
-      $headers[] = array('X-Frame-Options', 'Deny');
+      $headers[] = array('X-Frame-Options', 'SAMEORIGIN');
     }
 
     if ($this->getRequest() && $this->getRequest()->isHTTPS()) {
@@ -160,7 +160,7 @@ abstract class AphrontResponse extends Phobject {
     if ($this->frameable) {
       $csp[] = "frame-ancestors 'self'";
     } else {
-      $csp[] = "frame-ancestors 'none'";
+      $csp[] = "frame-ancestors 'self'";
     }
 
     // Block relics of the old world: Flash, Java applets, and so on.

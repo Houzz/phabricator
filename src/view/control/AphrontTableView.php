@@ -243,7 +243,10 @@ final class AphrontTableView extends AphrontView {
           ),
           $header);
       }
-      $table[] = phutil_tag('tr', array(), $tr);
+      //$table[] = phutil_tag('tr', array(), $tr);
+      $thead = array();
+      $thead[] = phutil_tag('tr', array(), $tr);
+      $table[] = phutil_tag('thead', array(), $thead);
     }
 
     foreach ($col_classes as $key => $value) {
