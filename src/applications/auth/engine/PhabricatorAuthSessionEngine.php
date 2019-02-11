@@ -681,7 +681,7 @@ final class PhabricatorAuthSessionEngine extends Phobject {
       id(new PhabricatorAuthTemporaryToken())
         ->setTokenResource($user->getPHID())
         ->setTokenType($onetime_type)
-        ->setTokenExpires(time() + phutil_units('1 day in seconds'))
+        ->setTokenExpires(time() + phutil_units('14 days in seconds'))
         ->setTokenCode($key_hash)
         ->save();
     unset($unguarded);
