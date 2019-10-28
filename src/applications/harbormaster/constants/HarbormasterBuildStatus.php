@@ -52,6 +52,10 @@ final class HarbormasterBuildStatus extends Phobject {
     return ($this->key === self::STATUS_PASSED);
   }
 
+  public function isFailed() {
+    return ($this->key === self::STATUS_FAILED);
+  }
+
 
   /**
    * Get a human readable name for a build status constant.
@@ -96,6 +100,19 @@ final class HarbormasterBuildStatus extends Phobject {
       self::STATUS_BUILDING,
       self::STATUS_PAUSED,
     );
+  }
+
+  public static function getIncompleteStatusConstants() {
+    $map = self::getBuildStatusSpecMap();
+
+    $constants = array();
+    foreach ($map as $constant => $spec) {
+      if (!$spec['isComplete']) {
+        $constants[] = $constant;
+      }
+    }
+
+    return $constants;
   }
 
   public static function getCompletedStatusConstants() {

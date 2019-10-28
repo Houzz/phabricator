@@ -47,7 +47,7 @@ final class ManiphestTaskSearchEngine
     // Hide the "Subtypes" constraint from the web UI if the install only
     // defines one task subtype, since it isn't of any use in this case.
     $subtype_map = id(new ManiphestTask())->newEditEngineSubtypeMap();
-    $hide_subtypes = (count($subtype_map) == 1);
+    $hide_subtypes = ($subtype_map->getCount() == 1);
 
     return array(
       id(new PhabricatorOwnersSearchField())
@@ -86,6 +86,10 @@ final class ManiphestTaskSearchEngine
           pht('Search for tasks with given subtypes.'))
         ->setDatasource(new ManiphestTaskSubtypeDatasource())
         ->setIsHidden($hide_subtypes),
+      id(new PhabricatorPHIDsSearchField())
+        ->setLabel(pht('Columns'))
+        ->setKey('columnPHIDs')
+        ->setAliases(array('column', 'columnPHID', 'columns')),
       id(new PhabricatorSearchThreeStateField())
         ->setLabel(pht('Open Parents'))
         ->setKey('hasParents')
@@ -246,6 +250,10 @@ final class ManiphestTaskSearchEngine
       $query->withSubtaskIDs($map['subtaskIDs']);
     }
 
+    if ($map['columnPHIDs']) {
+      $query->withColumnPHIDs($map['columnPHIDs']);
+    }
+
     $group = idx($map, 'group');
     $group = idx($this->getGroupValues(), $group);
     if ($group) {
@@ -358,14 +366,8 @@ final class ManiphestTaskSearchEngine
     $viewer = $this->requireViewer();
 
     if ($this->isPanelContext()) {
-      $can_edit_priority = false;
       $can_bulk_edit = false;
     } else {
-      $can_edit_priority = PhabricatorPolicyFilter::hasCapability(
-        $viewer,
-        $this->getApplication(),
-        ManiphestEditPriorityCapability::CAPABILITY);
-
       $can_bulk_edit = PhabricatorPolicyFilter::hasCapability(
         $viewer,
         $this->getApplication(),
@@ -376,7 +378,6 @@ final class ManiphestTaskSearchEngine
       ->setUser($viewer)
       ->setTasks($tasks)
       ->setSavedQuery($saved)
-      ->setCanEditPriority($can_edit_priority)
       ->setCanBatchEdit($can_bulk_edit)
       ->setShowBatchControls($this->showBatchControls);
 
@@ -508,7 +509,7 @@ final class ManiphestTaskSearchEngine
     );
 
     if (ManiphestTaskPoints::getIsEnabled()) {
-      $fields[] = id(new PhabricatorIntExportField())
+      $fields[] = id(new PhabricatorDoubleExportField())
         ->setKey('points')
         ->setLabel('Points');
     }

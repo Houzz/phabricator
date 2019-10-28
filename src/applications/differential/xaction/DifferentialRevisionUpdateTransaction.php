@@ -10,11 +10,37 @@ final class DifferentialRevisionUpdateTransaction
     return $object->getActiveDiffPHID();
   }
 
+  public function generateNewValue($object, $value) {
+    // See T13290. If we're updating the revision in response to a commit but
+    // the revision is already closed, return the old value so we no-op this
+    // transaction. We don't want to attach more than one commit-diff to a
+    // revision.
+
+    // Although we can try to bail out earlier so we don't generate this
+    // transaction in the first place, we may race another worker and end up
+    // trying to apply it anyway. Here, we have a lock on the object and can
+    // be certain about the object state.
+
+    if ($this->isCommitUpdate()) {
+      if ($object->isClosed()) {
+        return $this->generateOldValue($object);
+      }
+    }
+
+    return $value;
+  }
+
   public function applyInternalEffects($object, $value) {
     $should_review = $this->shouldRequestReviewAfterUpdate($object);
     if ($should_review) {
-      $object->setModernRevisionStatus(
-        DifferentialRevisionStatus::NEEDS_REVIEW);
+      // If we're updating a non-broadcasting revision, put it back in draft
+      // rather than moving it directly to "Needs Review".
+      if ($object->getShouldBroadcast()) {
+        $new_status = DifferentialRevisionStatus::NEEDS_REVIEW;
+      } else {
+        $new_status = DifferentialRevisionStatus::DRAFT;
+      }
+      $object->setModernRevisionStatus($new_status);
     }
 
     $editor = $this->getEditor();
@@ -51,6 +77,12 @@ final class DifferentialRevisionUpdateTransaction
     // Harbormaster. See discussion in T8650.
     $diff->setRevisionID($object->getID());
     $diff->save();
+  }
+
+  public function didCommitTransaction($object, $value) {
+    $editor = $this->getEditor();
+    $diff = $editor->requireDiff($value);
+    $omnipotent = PhabricatorUser::getOmnipotentUser();
 
     // If there are any outstanding buildables for this diff, tell
     // Harbormaster that their containers need to be updated. This is
@@ -58,7 +90,7 @@ final class DifferentialRevisionUpdateTransaction
     // and unit results.
 
     $buildables = id(new HarbormasterBuildableQuery())
-      ->setViewer(PhabricatorUser::getOmnipotentUser())
+      ->setViewer($omnipotent)
       ->withManualBuildables(false)
       ->withBuildablePHIDs(array($diff->getPHID()))
       ->execute();
@@ -87,7 +119,7 @@ final class DifferentialRevisionUpdateTransaction
   }
 
   public function getActionStrength() {
-    return 2;
+    return 200;
   }
 
   public function getTitle() {
@@ -137,7 +169,34 @@ final class DifferentialRevisionUpdateTransaction
         continue;
       }
 
-      if ($diff->getRevisionID()) {
+      $is_attached =
+        ($diff->getRevisionID()) &&
+        ($diff->getRevisionID() == $object->getID());
+      if ($is_attached) {
+        $is_active = ($diff_phid == $object->getActiveDiffPHID());
+      } else {
+        $is_active = false;
+      }
+
+      if ($is_attached) {
+        if ($is_active) {
+          // This is a no-op: we're reattaching the current active diff to the
+          // revision it is already attached to. This is valid and will just
+          // be dropped later on in the process.
+        } else {
+          // At least for now, there's no support for "undoing" a diff and
+          // reverting to an older proposed change without just creating a
+          // new diff from whole cloth.
+          $errors[] = $this->newInvalidError(
+            pht(
+              'You can not update this revision with the specified diff '.
+              '("%s") because this diff is already attached to the revision '.
+              'as an older version of the change.',
+              $diff_phid),
+            $xaction);
+          continue;
+        }
+      } else if ($diff->getRevisionID()) {
         $errors[] = $this->newInvalidError(
           pht(
             'You can not update this revision with the specified diff ("%s") '.
@@ -186,12 +245,12 @@ final class DifferentialRevisionUpdateTransaction
     return 'update';
   }
 
-  public function getFieldValuesForConduit($object, $data) {
-    $commit_phids = $object->getMetadataValue('commitPHIDs', array());
+  public function getFieldValuesForConduit($xaction, $data) {
+    $commit_phids = $xaction->getMetadataValue('commitPHIDs', array());
 
     return array(
-      'old' => $object->getOldValue(),
-      'new' => $object->getNewValue(),
+      'old' => $xaction->getOldValue(),
+      'new' => $xaction->getNewValue(),
       'commitPHIDs' => $commit_phids,
     );
   }

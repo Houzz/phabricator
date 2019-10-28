@@ -22,7 +22,9 @@ final class DifferentialRevisionHoldDraftTransaction
     // TODO: This can probably be removed once Draft is the universal default.
     if ($this->isNewObject()) {
       if ($object->isNeedsReview()) {
-        $object->setModernRevisionStatus(DifferentialRevisionStatus::DRAFT);
+        $object
+          ->setModernRevisionStatus(DifferentialRevisionStatus::DRAFT)
+          ->setShouldBroadcast(false);
       }
     }
   }
@@ -51,6 +53,17 @@ final class DifferentialRevisionHoldDraftTransaction
         $this->renderAuthor(),
         $this->renderObject());
     }
+  }
+
+  public function getTransactionTypeForConduit($xaction) {
+    return 'draft';
+  }
+
+  public function getFieldValuesForConduit($xaction, $data) {
+    return array(
+      'old' => $xaction->getOldValue(),
+      'new' => $xaction->getNewValue(),
+    );
   }
 
 }
