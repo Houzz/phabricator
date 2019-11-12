@@ -3,7 +3,7 @@
 final class PhabricatorPhrictionApplication extends PhabricatorApplication {
 
   public function getName() {
-    return pht('Phriction');
+    return pht('Wiki');
   }
 
   public function getShortDescription() {

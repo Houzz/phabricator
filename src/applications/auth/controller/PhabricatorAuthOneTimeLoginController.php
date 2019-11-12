@@ -209,7 +209,7 @@ final class PhabricatorAuthOneTimeLoginController
         id(new PhabricatorAuthTemporaryToken())
           ->setTokenResource($user->getPHID())
           ->setTokenType($password_type)
-          ->setTokenExpires(time() + phutil_units('1 hour in seconds'))
+          ->setTokenExpires(time() + phutil_units('7 days in seconds'))
           ->setTokenCode(PhabricatorHash::weakDigest($key))
           ->save();
       unset($unguarded);
